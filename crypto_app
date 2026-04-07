@@ -1,0 +1,141 @@
+import hashlib
+import os
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import hashes
+
+# ==========================================
+# 1. SHA-256 Hashing (Strings and Files)
+# ==========================================
+
+def generate_sha256_string(input_string):
+    """Generates a SHA-256 hash for a given string."""
+    # Encode the string to bytes, then hash
+    hash_object = hashlib.sha256(input_string.encode('utf-8'))
+    return hash_object.hexdigest()
+
+def generate_sha256_file(filepath):
+    """Generates a SHA-256 hash for a given file."""
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            # Read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except FileNotFoundError:
+        return "Error: File not found."
+
+# ==========================================
+# 2. Substitution Cipher (Caesar Cipher)
+# ==========================================
+
+def caesar_cipher(text, shift, mode='encrypt'):
+    """Encrypts or decrypts text using a Caesar cipher."""
+    result = ""
+    if mode == 'decrypt':
+        shift = -shift
+
+    for char in text:
+        if char.isalpha():
+            # Determine if uppercase or lowercase for ASCII boundary
+            start = ord('A') if char.isupper() else ord('a')
+            # Shift character and wrap around the alphabet
+            shifted_char = chr((ord(char) - start + shift) % 26 + start)
+            result += shifted_char
+        else:
+            # Leave spaces and punctuation as is
+            result += char
+    return result
+
+# ==========================================
+# 3. Digital Signature Simulation
+# ==========================================
+
+def generate_key_pair():
+    """Generates an RSA public/private key pair."""
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    return private_key, public_key
+
+def sign_message(private_key, message):
+    """Signs a message using the private key."""
+    signature = private_key.sign(
+        message.encode('utf-8'),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return signature
+
+def verify_signature(public_key, message, signature):
+    """Verifies a signature using the public key."""
+    try:
+        public_key.verify(
+            signature,
+            message.encode('utf-8'),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True
+    except Exception:
+        return False
+
+# ==========================================
+# Main Execution (Demonstration)
+# ==========================================
+
+if __name__ == "__main__":
+    print("--- Cryptography App Demonstration ---\n")
+
+    # 1. Hashing Demo
+    print("1. SHA-256 HASHING")
+    sample_text = "Secure password 123!"
+    print(f"Original String: {sample_text}")
+    print(f"String Hash: {generate_sha256_string(sample_text)}")
+    
+    # Create a temporary file to hash
+    with open("temp_test.txt", "w") as f:
+        f.write("This is a test file for hashing.")
+    print(f"File Hash (temp_test.txt): {generate_sha256_file('temp_test.txt')}")
+    os.remove("temp_test.txt") # Clean up
+    print("-" * 40)
+
+    # 2. Cipher Demo
+    print("\n2. CAESAR CIPHER")
+    secret_message = "Hello, World! Meet me at 9 PM."
+    shift_value = 5
+    encrypted = caesar_cipher(secret_message, shift_value, 'encrypt')
+    decrypted = caesar_cipher(encrypted, shift_value, 'decrypt')
+    
+    print(f"Original:  {secret_message}")
+    print(f"Encrypted: {encrypted}")
+    print(f"Decrypted: {decrypted}")
+    print("-" * 40)
+
+    # 3. Digital Signature Demo
+    print("\n3. DIGITAL SIGNATURE")
+    print("Generating RSA Key Pair...")
+    priv_key, pub_key = generate_key_pair()
+    
+    doc_to_sign = "Important Contract Data"
+    print(f"Document to sign: '{doc_to_sign}'")
+    
+    signature = sign_message(priv_key, doc_to_sign)
+    print("Document successfully signed.")
+    
+    # Verify the correct document
+    is_valid = verify_signature(pub_key, doc_to_sign, signature)
+    print(f"Verification against original document: {'VALID' if is_valid else 'INVALID'}")
+    
+    # Verify a tampered document
+    tampered_doc = "Important Contract Data - Altered!"
+    is_valid_tampered = verify_signature(pub_key, tampered_doc, signature)
+    print(f"Verification against tampered document: {'VALID' if is_valid_tampered else 'INVALID'}")
